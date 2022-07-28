@@ -21,6 +21,7 @@ export class BinaryReader
 	 * Constructs a new BinaryReader.
 	 * 
 	 * @param {ArrayBuffer} arrayBuffer 
+	 * @author Loren Goodwin
 	 */
 	constructor(arrayBuffer)
 	{
@@ -31,6 +32,7 @@ export class BinaryReader
 	 * Returns a signed 8-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readInt8()
 	{
@@ -45,6 +47,7 @@ export class BinaryReader
 	 * Reads a signed 16-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readInt16()
 	{
@@ -59,6 +62,7 @@ export class BinaryReader
 	 * Reads a signed 32-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readInt32()
 	{
@@ -73,6 +77,7 @@ export class BinaryReader
 	 * Reads a signed 64-bit integer.
 	 * 
 	 * @returns {BigInt}
+	 * @author Loren Goodwin
 	 */
 	readInt64()
 	{
@@ -87,6 +92,7 @@ export class BinaryReader
 	 * Reads an unsigned 8-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readUInt8()
 	{
@@ -101,6 +107,7 @@ export class BinaryReader
 	 * Reads an unsigned 16-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readUInt16()
 	{
@@ -115,6 +122,7 @@ export class BinaryReader
 	 * Reads an unsigned 32-bit integer.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readUInt32()
 	{
@@ -129,6 +137,7 @@ export class BinaryReader
 	 * Reads an unsigned 64-bit integer.
 	 * 
 	 * @returns {BigInt}
+	 * @author Loren Goodwin
 	 */
 	readUInt64()
 	{
@@ -143,6 +152,7 @@ export class BinaryReader
 	 * Returns a 32-bit floating point number.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readFloat32()
 	{
@@ -157,6 +167,7 @@ export class BinaryReader
 	 * Reads a 64-bit floating point number.
 	 * 
 	 * @returns {Number}
+	 * @author Loren Goodwin
 	 */
 	readFloat64()
 	{
@@ -171,6 +182,7 @@ export class BinaryReader
 	 * Reads a char.
 	 * 
 	 * @returns {String}
+	 * @author Loren Goodwin
 	 */
 	readChar()
 	{
@@ -185,6 +197,7 @@ export class BinaryReader
 	 * This function assumes the next byte is a string length followed by the bytes of the string.
 	 * 
 	 * @returns {String}
+	 * @author Loren Goodwin
 	 */
 	readString() 
 	{
