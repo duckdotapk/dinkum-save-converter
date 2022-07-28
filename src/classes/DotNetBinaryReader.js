@@ -230,6 +230,8 @@ export class DotNetBinaryReader extends BinaryReader
 	 * Reads the binary library.
 	 * 
 	 * @returns {BinaryLibrary}
+	 * @author Loren Goodwin
+	 * @author Proddy
 	 */
 	#readBinaryLibrary()
 	{
@@ -247,6 +249,8 @@ export class DotNetBinaryReader extends BinaryReader
 	 * Reads the serialized class.
 	 * 
 	 * @returns {SerializedClass}
+	 * @author Loren Goodwin
+	 * @author Proddy
 	 */
 	#readSerializedClass()
 	{
@@ -258,24 +262,57 @@ export class DotNetBinaryReader extends BinaryReader
 			memberCount: this.readUInt32(),
 		};
 
-		//
-		// Get Member Names
-		//
+		// Read Member Names
+		serializedClass.memberNames = this.#readSerializedClassMemberNames(serializedClass.memberCount);
 
-		serializedClass.memberNames = [];
+		// Read Member Types
+		serializedClass.memberTypes = this.#readSerializedClassMemberTypes(serializedClass.memberCount);
 
-		for(let i = 0; i < serializedClass.memberCount; i++)
+		// Read Library ID
+		// 	NOTE: If this isn't 2, the file is fucked
+		//	Should probably do error handling here
+		//	Josh said this is an identifier that explains how to read the rest of the file
+		serializedClass.libraryId = this.readUInt32();
+
+		// Read Member Values
+		serializedClass.memberValues = this.#readSerializedClassMemberValues(serializedClass.memberCount, serializedClass.memberTypes);
+
+		return serializedClass;
+	} 
+
+	/**
+	 * Reads the serialized class' member names.
+	 * 
+	 * @param {Number} memberCount
+	 * @returns {Array<String>}
+	 * @author Loren Goodwin
+	 * @author Proddy
+	 */
+	#readSerializedClassMemberNames(memberCount)
+	{
+		const memberNames = [];
+
+		for(let i = 0; i < memberCount; i++)
 		{
-			serializedClass.memberNames.push(this.readString());
+			memberNames.push(this.readString());
 		}
 
-		//
-		// Get Member Types
-		//
+		return memberNames;
+	}
 
-		serializedClass.memberTypes = [];
+	/**
+	 * Reads the serialized class' member types.
+	 * 
+	 * @param {Number} memberCount 
+	 * @returns {Array<SerializedClassMemberType>}
+	 * @author Loren Goodwin
+	 * @author Proddy
+	 */
+	#readSerializedClassMemberTypes(memberCount)
+	{
+		const memberTypes = [];
 
-		for(let i = 0; i < serializedClass.memberCount; i++)
+		for(let i = 0; i < memberCount; i++)
 		{
 			/** @type {SerializedClassMemberType} */
 			const type =
@@ -284,17 +321,13 @@ export class DotNetBinaryReader extends BinaryReader
 				additionalInfo: undefined,
 			};
 
-			serializedClass.memberTypes.push(type);
+			memberTypes.push(type);
 		}
 
-		//
-		// Get Additional Type Info
-		//
-
-		for (let i = 0; i < serializedClass.memberCount; i++)
+		for (let i = 0; i < memberCount; i++)
 		{
 			/** @type {SerializedClassMemberType} */
-			const type = serializedClass.memberTypes[i];
+			const type = memberTypes[i];
 
 			switch(type.id)
 			{
@@ -327,20 +360,26 @@ export class DotNetBinaryReader extends BinaryReader
 			}
 		}
 
-		//
-		// Get Member Values
-		//
+		return memberTypes;
+	}
 
-		// NOTE: If this isn't 2, the file is fucked
-		//	Should probably do error handling here
-		//	Josh said this is an identifier that explains how to read the rest of the file
-		serializedClass.libraryId = this.readUInt32();
+	/**
+	 * Reads the serialized class' member values.
+	 * 
+	 * @param {Number} memberCount 
+	 * @param {Array<SerializedClassMemberType>} memberTypes 
+	 * @returns {Array<SerializedClassMemberValue>}
+	 * @author Loren Goodwin
+	 * @author Proddy
+	 */
+	#readSerializedClassMemberValues(memberCount, memberTypes)
+	{
+		const memberValues = [];
 
-		serializedClass.memberValues = [];
-
-		for(let i = 0; i < serializedClass.memberCount; i++)
+		// Read Member Values
+		for(let i = 0; i < memberCount; i++)
 		{
-			const type = serializedClass.memberTypes[i];
+			const type = memberTypes[i];
 
 			const value = {};
 
@@ -381,23 +420,20 @@ export class DotNetBinaryReader extends BinaryReader
 				}
 			}
 
-			serializedClass.memberValues.push(value);
+			memberValues.push(value);
 		}
 
-		//
-		// Get Array Member Values
-		//
-
-		for(let i = 0; i < serializedClass.memberCount; i++)
+		// Read Array Member Values
+		for(let i = 0; i < memberCount; i++)
 		{
-			const type = serializedClass.memberTypes[i];
+			const type = memberTypes[i];
 
 			if (type.id != 7)
 			{
 				continue;
 			}
 
-			const value = serializedClass.memberValues[i];
+			const value = memberValues[i];
 
 			value.recordType = this.readUInt8();
 
@@ -421,6 +457,6 @@ export class DotNetBinaryReader extends BinaryReader
 			}
 		}
 
-		return serializedClass;
-	} 
+		return memberValues;
+	}
 }
