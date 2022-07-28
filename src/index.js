@@ -146,6 +146,20 @@ function readPrimitive(type, view, pos)
  * @property {Number} majorVersion
  * @property {Number} minorVersion
  */
+
+/**
+ * @typedef {Object} BinaryFormatterData
+ * @property {SerializationHeader} serializationHeader
+ * @property {Object} binaryLibrary
+ * @property {Object} class
+ */
+
+/**
+ * Reads a data file created with a .NET BinaryFormatter.
+ * 
+ * @param {String} path The path to the file.
+ * @returns {BinaryFormatterData}
+ */
 function readBinaryFormatterData(path)
 {
 	const nodeBuffer = fs.readFileSync(path);
@@ -162,6 +176,7 @@ function readBinaryFormatterData(path)
 	
 	const data = {};
 	
+	// Note: 0B signifies the end of one of these files
 	while(recordId != 0x0B)
 	{
 		if (recordId == 0x00)
