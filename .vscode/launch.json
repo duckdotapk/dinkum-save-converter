@@ -10,8 +10,21 @@
             [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\src\\index.js",
-            "cwd": "${workspaceFolder}\\src",
+			"windows":
+			{
+				"program": "${workspaceFolder}\\src\\index.js",
+				"cwd": "${workspaceFolder}\\src",
+			},
+			"linux":
+			{
+				"program": "${workspaceFolder}/src/index.js",
+				"cwd": "${workspaceFolder}/src",
+			},
+			"osx":
+			{
+				"program": "${workspaceFolder}/src/index.js",
+				"cwd": "${workspaceFolder}/src",
+			},
 			"console": "integratedTerminal",
 			"outFiles": 
 			[
