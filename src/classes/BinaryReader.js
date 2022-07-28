@@ -51,6 +51,20 @@ export class BinaryReader
 	}
 
 	/**
+	 * Reads an unsigned 8-bit integer from the file.
+	 * 
+	 * @returns {Number}
+	 */
+	readUInt8()
+	{
+		const int = this.view.getUint8(this.position);
+
+		this.position += 1;
+
+		return int;
+	}
+
+	/**
 	 * Reads an unsigned 32-bit integer from the file.
 	 * 
 	 * @returns {Number}

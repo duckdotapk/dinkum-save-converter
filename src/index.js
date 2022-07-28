@@ -148,9 +148,15 @@ function readPrimitive(type, view, pos)
  */
 
 /**
+ * @typedef {Object} BinaryLibrary
+ * @property {Number} id
+ * @property {String} name
+ */
+
+/**
  * @typedef {Object} BinaryFormatterData
  * @property {SerializationHeader} serializationHeader
- * @property {Object} binaryLibrary
+ * @property {BinaryLibrary} binaryLibrary
  * @property {Object} class
  */
 
@@ -168,12 +174,13 @@ function readBinaryFormatterData(path)
 
 	const binaryReader = new BinaryReader(arrayBuffer);
 
+	// TODO: Replace view and pos with the above binaryReader
 	const view = new DataView(arrayBuffer);
-	
 	let pos = 1;
 	
 	let recordId = view.getUint8();
 	
+	/** @type {BinaryFormatterData} */
 	const data = {};
 	
 	// Note: 0B signifies the end of one of these files
@@ -181,29 +188,27 @@ function readBinaryFormatterData(path)
 	{
 		if (recordId == 0x00)
 		{
-			data.serializationHeader = {};
-	
-			data.serializationHeader.rootId = view.getUint32(pos, true);
-			pos += 4;
-	
-			data.serializationHeader.headerId = view.getUint32(pos, true);
-			pos += 4;
-	
-			data.serializationHeader.majorVersion = view.getUint32(pos, true);
-			pos += 4;
-	
-			data.serializationHeader.minorVersion = view.getUint32(pos, true);
-			pos += 4;
+			data.serializationHeader = 
+			{
+				rootId: binaryReader.readUInt32(),
+				headerId: binaryReader.readUInt32(),
+				majorVersion: binaryReader.readUInt32(),
+				minorVersion: binaryReader.readUInt32(),
+			};
+
+			// TODO: Remove this once everything uses BinaryReader
+			pos = binaryReader.position;
 		}
 		else if (recordId == 0x0C) 
 		{
-			data.binaryLibrary = {};
-	
-			data.binaryLibrary.libraryId = view.getUint32(pos, true);
-			pos += 4;
-	
-			data.binaryLibrary.libraryName = readString(view, pos);
-			pos += data.binaryLibrary.libraryName.length + 1;
+			data.binaryLibrary =
+			{
+				id: binaryReader.readUInt32(),
+				name: binaryReader.readString(),
+			};
+
+			// TODO: Remove this once everything uses BinaryReader
+			pos = binaryReader.position;
 		}
 		else if (recordId == 0x05) 
 		{
@@ -421,6 +426,9 @@ function readBinaryFormatterData(path)
 	
 		recordId = view.getUint8(pos);
 		pos += 1;
+		
+		// TODO: change the above code to use this
+		binaryReader.readUInt8();
 	}
 
 	return data;
