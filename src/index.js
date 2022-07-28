@@ -4,140 +4,12 @@
 
 import fs from "node:fs";
 
-import { BinaryReader } from "./classes/BinaryReader.js";
+import { DotNetBinaryReader } from "./classes/DotNetBinaryReader.js";
 
-//
-// Functions
-//
-
-function readString(view, pos) 
-{
-	let length = view.getUint8(pos);
-	
-	pos++;
-
-	let buffer = [];
-
-	for (let i = 0; i < length; i++) 
-	{
-		buffer.push(view.getUint8(pos));
-		pos++;
-	}
-
-	return String.fromCharCode.apply(String, buffer);
-}
 
 //
 // Stuff
 //
-
-/**
- * @param {Number} type The type of primitive.
- * @param {DataView} view A data view to read from.
- * @param {Number} pos The position to start at in the data view.
- * @returns {Array<Number|String, DataView>}
- */
-function readPrimitive(type, view, pos)
-{
-	let value;
-
-	switch (type)
-	{
-		case 1: // Boolean
-		case 2: // Byte
-			value = view.getUint8(pos);
-			pos += 1;
-
-			break;
-
-		case 3: // Char
-			value = String.fromCharCode(view.getUint8(pos));
-			pos += 1;
-
-			break;
-
-		case 4: // Unused
-			throw new Error("Invalid primitive type:", type);
-
-		case 5: // Decimal
-			value = readString(view, pos);
-			pos += value.value.length + 1;
-
-			break;
-
-		case 6: // Double
-			value = view.getFloat64(pos, true);
-			pos += 8;
-
-			break;
-
-		case 7: // Short (Int16)
-			value = view.getInt16(pos, true);
-			pos += 2;
-			break;
-		
-		case 8: // Integer (Int32)
-			value = view.getInt32(pos, true);
-			pos += 4;
-
-			break;
-
-		case 9: // Long (Int64)
-			value = view.getBigInt64(pos, true);
-			pos += 8;
-
-			break;
-		
-		case 10: // Signed Byte
-			value = view.getInt8(pos, true);
-			pos += 1;
-
-			break;
-
-		case 11: // Single
-			value = view.getFloat32(pos, true);
-			pos += 4;
-			break;
-
-		case 12: // Timespan						
-		case 13: // Datetime
-			value = view.getBigInt64(pos, true);
-			pos += 8;
-
-			break;
-
-		case 14: // UShort (UInt16)
-			value = view.getUint16(pos, true);
-			pos += 2;
-			break;
-
-		case 15: // UInteger (UInt32)
-			value = view.getUint32(pos, true);
-			pos += 4;
-
-			break;
-
-		case 16: // ULong (UInt64)
-			value = view.getUint64(pos, true);
-			pos += 8;
-
-			break;
-
-		case 17: // Null
-			break;
-
-		case 18: // String
-			value.value = readString(view, pos);
-			pos += value.value.length + 1;
-
-			break;
-
-		default:
-			throw new Error("Invalid primitive type:", type);
-	}
-
-	return [ value, pos ];
-}
 
 /**
  * @typedef {Object} BinaryFormatterData
@@ -198,13 +70,9 @@ function readBinaryFormatterData(path)
 
 	const arrayBuffer = new Uint8Array(nodeBuffer).buffer;
 
-	const binaryReader = new BinaryReader(arrayBuffer);
-
-	// TODO: Replace view and pos with the above binaryReader
-	const view = new DataView(arrayBuffer);
-	let pos = 1;
+	const binaryReader = new DotNetBinaryReader(arrayBuffer);
 	
-	let recordId = view.getUint8();
+	let recordId = 0x00;
 	
 	/** @type {BinaryFormatterData} */
 	const data = {};
@@ -221,9 +89,6 @@ function readBinaryFormatterData(path)
 				majorVersion: binaryReader.readUInt32(),
 				minorVersion: binaryReader.readUInt32(),
 			};
-
-			// TODO: Remove this once everything uses BinaryReader
-			pos = binaryReader.position;
 		}
 		else if (recordId == 0x0C) 
 		{
@@ -232,9 +97,6 @@ function readBinaryFormatterData(path)
 				id: binaryReader.readUInt32(),
 				name: binaryReader.readString(),
 			};
-
-			// TODO: Remove this once everything uses BinaryReader
-			pos = binaryReader.position;
 		}
 		else if (recordId == 0x05) 
 		{
@@ -249,8 +111,6 @@ function readBinaryFormatterData(path)
 				name: binaryReader.readString(),
 				memberCount: binaryReader.readUInt32(),
 			};
-
-			pos = binaryReader.position;
 	
 			//
 			// Get Member Names
@@ -329,9 +189,6 @@ function readBinaryFormatterData(path)
 			//	Should probably do error handling here
 			//	Josh said this is an identifier that explains how to read the rest of the file
 			data.class.libraryId = binaryReader.readUInt32();
-
-			// TODO: Remove this when the below code uses BinaryReader
-			pos = binaryReader.position;
 	
 			data.class.memberValues = [];
 	
@@ -344,41 +201,30 @@ function readBinaryFormatterData(path)
 				switch (type.id)
 				{
 					case 0:
-					{
-						const [ value2, newPos ] = readPrimitive(type.additionalInfo, view, pos);
-
-						value.value = value2;
-						pos = newPos;
-	
+						value.value = binaryReader.readPrimitive(type.additionalInfo);	
 						break;
-					}
 	
 					case 1:
 					{
-						value.recordType = view.getUint8(pos);
-						pos += 1;
+						value.recordType = binaryReader.readUInt8();
 	
 						if (value.recordType != 6)
 						{
 							throw new Error("Unknown string record type:", value.recordType);
 						}
-	
-						value.objectId = view.getUint32(pos, true);
-						pos += 4;
-	
-						value.value = readString(view, pos);
-						pos += value.value.length + 1;
+
+						value.objectId = binaryReader.readUInt32();
+
+						value.value = binaryReader.readString();
 	
 						break;
 					}
 	
 					case 7:
 					{
-						value.recordType = view.getUint8(pos);
-						pos += 1;
-	
-						value.index = view.getUint32(pos, true);
-						pos += 4;
+						value.recordType = binaryReader.readUInt8();
+
+						value.index = binaryReader.readUInt32();
 	
 						break;
 					}
@@ -406,34 +252,26 @@ function readBinaryFormatterData(path)
 				}
 	
 				const value = data.class.memberValues[i];
-	
-				value.recordType = view.getUint8(pos);
-				pos += 1;
+
+				value.recordType = binaryReader.readUInt8();
 	
 				// Note: Skip over padding
-				while (value.recordType != 15)
+				while (value.recordType == 0)
 				{
-					value.recordType = view.getUint8(pos);
-					pos += 1;
+					value.recordType = binaryReader.readUInt8();
 				}
 	
-				value.id = view.getUint32(pos, true);
-				pos += 4;
-	
-				value.length = view.getUint32(pos, true);
-				pos += 4;
-	
-				value.primitiveType = view.getUint8(pos);
-				pos += 1;
+				value.id = binaryReader.readUInt32();
+
+				value.length = binaryReader.readUInt32();
+
+				value.primitiveType = binaryReader.readUInt8();
 	
 				value.value = [];
 	
 				for(let i = 0; i < value.length; i++)
 				{
-					const [ value2, newPos ] = readPrimitive(value.primitiveType, view, pos);
-
-					value.value[i] = value2;
-					pos = newPos;
+					value.value.push(binaryReader.readPrimitive(value.primitiveType));
 				}
 			}
 	
@@ -450,9 +288,9 @@ function readBinaryFormatterData(path)
 	return data;
 }
 
-const data = readBinaryFormatterData("C:\\Users\\Loren\\Dropbox\\Private\\Saved Games 2\\Dinkum\\Slot0\\playerInfo.dat");
+const data = readBinaryFormatterData("/home/loren/Dropbox/Private/Saved Games 2/Dinkum/Slot0/playerInfo.dat");
 
-fs.writeFileSync("C:\\Users\\Loren\\Desktop\\playerInfo.raw.json", 
+fs.writeFileSync("/home/loren/Dropbox/Private/Saved Games 2/Dinkum/Slot0/playerInfo.raw.json", 
 	JSON.stringify(data, (key, value) =>
 	{
 		if(typeof(value) == "bigint")
