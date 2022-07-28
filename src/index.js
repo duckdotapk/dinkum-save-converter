@@ -140,6 +140,13 @@ function readPrimitive(type, view, pos)
 }
 
 /**
+ * @typedef {Object} BinaryFormatterData
+ * @property {SerializationHeader} serializationHeader
+ * @property {BinaryLibrary} binaryLibrary
+ * @property {SerializedClass} class
+ */
+
+/**
  * @typedef {Object} SerializationHeader
  * @property {Number} rootId
  * @property {Number} headerId
@@ -154,10 +161,29 @@ function readPrimitive(type, view, pos)
  */
 
 /**
- * @typedef {Object} BinaryFormatterData
- * @property {SerializationHeader} serializationHeader
- * @property {BinaryLibrary} binaryLibrary
- * @property {Object} class
+ * @typedef {Object} SerializedClass
+ * @property {Number} objectId
+ * @property {String} name The name of the class that was serialized.
+ * @property {Number} memberCount The count of members in this class.
+ * @property {Array<String>} memberNames An array of all of the names of this class' members.
+ * @property {Array<SerializedClassMemberType>} memberTypes Type information for the class' members.
+ * @property {Array<SerializedClassMemberValue>} memberValues The values for each member.
+ */
+
+/**
+ * @typedef {Object} SerializedClassMemberType
+ * @property {Number} id
+ * @property {Number|SerializedClassMemberTypeDetails} additionalInfo
+ */
+
+/**
+ * @typedef {Object} SerializedClassMemberTypeDetails
+ * @property {String} name
+ * @property {Number} libraryId
+ */
+
+/**
+ * @typedef {Object} SerializedClassMemberValue
  */
 
 /**
@@ -216,16 +242,15 @@ function readBinaryFormatterData(path)
 			// Object Details
 			//
 	
-			data.class = {};
-	
-			data.class.objectId = view.getUint32(pos, true);
-			pos += 4;
-	
-			data.class.name = readString(view, pos);
-			pos += data.class.name.length + 1;
-	
-			data.class.memberCount = view.getUint32(pos, true);
-			pos += 4;
+			/** @type {SerializedClass} */
+			data.class = 
+			{
+				objectId: binaryReader.readUInt32(),
+				name: binaryReader.readString(),
+				memberCount: binaryReader.readUInt32(),
+			};
+
+			pos = binaryReader.position;
 	
 			//
 			// Get Member Names
@@ -235,10 +260,7 @@ function readBinaryFormatterData(path)
 	
 			for(let i = 0; i < data.class.memberCount; i++)
 			{
-				const memberName = readString(view, pos);
-				pos += memberName.length + 1;
-	
-				data.class.memberNames.push(memberName);
+				data.class.memberNames.push(binaryReader.readString());
 			}
 	
 			//
@@ -249,13 +271,12 @@ function readBinaryFormatterData(path)
 	
 			for(let i = 0; i < data.class.memberCount; i++)
 			{
+				/** @type {SerializedClassMemberType} */
 				const type =
 				{
-					id: view.getUint8(pos),
+					id: binaryReader.readUInt8(),
 					additionalInfo: undefined,
 				};
-	
-				pos += 1;
 	
 				data.class.memberTypes.push(type);
 			}
@@ -266,14 +287,14 @@ function readBinaryFormatterData(path)
 	
 			for (let i = 0; i < data.class.memberCount; i++)
 			{
+				/** @type {SerializedClassMemberType} */
 				const type = data.class.memberTypes[i];
 	
 				switch(type.id)
 				{
 					case 0:
 					case 7:
-						type.additionalInfo = view.getUint8(pos);
-						pos += 1;
+						type.additionalInfo = binaryReader.readUInt8();
 	
 						break;
 	
@@ -282,19 +303,16 @@ function readBinaryFormatterData(path)
 						break;
 	
 					case 3:
-						type.additionalInfo = readString(view, pos);
-						pos += type.additionalInfo.length + 1;
-	
+						type.additionalInfo = binaryReader.readString();	
+
 						break;
 	
 					case 4:
-						type.additionalInfo = {};
-	
-						type.additionalInfo.typeName = readString(view, pos);
-						pos += type.additionalInfo.typeName.length + 1;
-	
-						type.additionalInfo.libraryId = view.getUint8(pos);
-						pos += 4;
+						type.additionalInfo = 
+						{
+							name: binaryReader.readString(),
+							libraryId: binaryReader.readUInt8(),
+						};
 	
 						break;
 	
@@ -310,8 +328,10 @@ function readBinaryFormatterData(path)
 			// NOTE: If this isn't 2, the file is fucked
 			//	Should probably do error handling here
 			//	Josh said this is an identifier that explains how to read the rest of the file
-			data.class.libraryId = view.getUint32(pos, true);
-			pos += 4;
+			data.class.libraryId = binaryReader.readUInt32();
+
+			// TODO: Remove this when the below code uses BinaryReader
+			pos = binaryReader.position;
 	
 			data.class.memberValues = [];
 	
@@ -424,11 +444,7 @@ function readBinaryFormatterData(path)
 			throw new Error("Unexpected record ID:", recordId);
 		}
 	
-		recordId = view.getUint8(pos);
-		pos += 1;
-		
-		// TODO: change the above code to use this
-		binaryReader.readUInt8();
+		recordId = binaryReader.readUInt8();		
 	}
 
 	return data;
