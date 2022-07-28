@@ -1,0 +1,17 @@
+{
+  "name": "dinkum-save-converter",
+  "version": "1.0.0",
+  "description": "A tool for converting saved games for Dinkum to and from an easy-to-edit plain text format.",
+  "main": "./index.js",
+  "scripts": {},
+  "keywords": [
+    "dinkum"
+  ],
+  "author": "Loren Goodwin",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@donutteam/eslint-config": "^1.0.6"
+  }
+}
