@@ -139,8 +139,9 @@ export class DotNetBinaryReader extends BinaryReader
 	}
 	
 	/**
-	 * Reads a primitive value
+	 * Reads a primitive value.
 	 * 
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A77%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C625%2C0%5D
 	 * @param {Number} type The type of primitive to read.
 	 * @returns {Number|String}
 	 * @author Loren Goodwin
