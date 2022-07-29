@@ -31,6 +31,8 @@ Currently, you can **only partially dump** your save data. The tool is only capa
 - `playerInfo.dat`
 - `townStatus.dat`
 
+Furthermore, the files are currently dumped as essentially one-to-one representations of the Microsoft .NET BinaryFormatter file format that the game uses. I intend to improve upon this in the future after converting the data.
+
 ## Special Thanks
 My good friend, [Proddy](https://github.com/Hampo), has been a tremendous help with this project so far and I'd like to thank him here for his assistance.
 
