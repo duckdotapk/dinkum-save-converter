@@ -197,7 +197,8 @@ export class DotNetBinaryReader extends BinaryReader
 				return this.readUInt64();
 
 			case 17: // Null
-				return;
+				// TODO: implement this
+				throw new Error("Unimplemented primitive type:", type);
 
 			case 18: // String
 				return this.readString();
