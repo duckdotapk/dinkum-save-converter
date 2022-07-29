@@ -151,7 +151,7 @@ export class DotNetBinaryReader extends BinaryReader
 		switch (type)
 		{
 			case 1: // Boolean
-				return this.readUInt8 != 0;
+				return this.readUInt8() != 0;
 
 			case 2: // Byte
 				return this.readUInt8();
