@@ -44,7 +44,8 @@ const saveDirEntries = fs.readdirSync(saveDir,
 	})
 	.filter((entry) =>
 	{
-		return entry.name.endsWith(".dat");
+		return entry.name.endsWith(".dat") &&
+			entry.name != "versionCheck.dat";
 	});
 
 const dumpDir = path.join(saveDir, "_JSON_DUMP");

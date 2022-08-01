@@ -10,7 +10,7 @@ export class BinaryReader
 	/**
 	 * @type {Number}
 	 */
-	position = 1;
+	position = 0;
 
 	/** 
 	 * @type {DataView} 

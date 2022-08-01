@@ -2,31 +2,29 @@
 // Imports
 //
 
+import assert from "node:assert";
+
 import { BinaryReader } from "./BinaryReader.js";
 
 //
 // Type Definitions
 //
 
+
 /**
- * @typedef {Object} BinaryFormatterData
- * @property {SerializedStreamHeader} serializedStreamHeader
- * @property {BinaryLibrary} binaryLibrary
- * @property {ClassWithMembersAndTypes} serializedClass
+ * @typedef {Object} SerializationHeaderRecord
+ * @property {Number} RecordType
+ * @property {Number} RootId
+ * @property {Number} HeaderId
+ * @property {Number} MajorVersion
+ * @property {Number} MinorVersion
  */
 
 /**
- * @typedef {Object} SerializedStreamHeader
- * @property {Number} rootId
- * @property {Number} headerId
- * @property {Number} majorVersion
- * @property {Number} minorVersion
- */
-
-/**
+ * @property {Number} RecordType
  * @typedef {Object} BinaryLibrary
- * @property {Number} id
- * @property {String} name
+ * @property {Number} LibraryId
+ * @property {String} LibraryName
  */
 
 /**
@@ -64,6 +62,21 @@ import { BinaryReader } from "./BinaryReader.js";
  */
 export class DotNetBinaryReader extends BinaryReader
 {
+	/**
+	 * An enumeration containg types of binary arrays.
+	 * 
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A113%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C674%2C0%5D
+	 */
+	static BinaryArrayTypeEnumeration =
+		{
+			Single: 0,
+			Jagged: 1,
+			Rectangular: 2,
+			SingleOffset: 3,
+			JaggedOffset: 4,
+			RectangularOffset: 5,
+		};
+
 	/**
 	 * An enumeration containing valid record types.
 	 * 
@@ -138,30 +151,6 @@ export class DotNetBinaryReader extends BinaryReader
 		};
 
 	/**
-	 * An enumeration containing message flags.
-	 * 
-	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A79%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C469%2C0%5D
-	 */
-	static MessageFlags =
-		{
-			NoArgs: 0x00000001,
-			ArgsInline: 0x00000002,
-			ArgsIsArray: 0x00000004,
-			ArgsInArray: 0x00000008,
-			NoContext: 0x00000010,
-			ContextInline: 0x00000020,
-			ContextInArray: 0x00000040,
-			MethodSignatureInArray: 0x00000080,
-			PropertiesInArray: 0x00000100,
-			NoReturnValue: 0x00000200,
-			ReturnValueVoid: 0x00000400,
-			ReturnValueInline: 0x00000800,
-			ReturnValueInArray: 0x00001000,
-			ExceptionInArray: 0x00002000,
-			GenericMethod: 0x00008000,
-		};
-
-	/**
 	 * @type {import("node:fs")}
 	 */
 	static #fs = null;
@@ -176,6 +165,8 @@ export class DotNetBinaryReader extends BinaryReader
 	 */
 	static async readFile(path)
 	{
+		console.log(`[DotNetBinaryReader] Reading from file: ${ path }`);
+
 		if (DotNetBinaryReader.#fs == null)
 		{
 			DotNetBinaryReader.#fs = await import("node:fs");
@@ -187,7 +178,9 @@ export class DotNetBinaryReader extends BinaryReader
 
 		const arrayBuffer = new Uint8Array(nodeBuffer).buffer;
 
-		return await this.readSerializationStream(arrayBuffer);
+		const binaryReader = new DotNetBinaryReader(arrayBuffer);
+
+		return binaryReader.read();
 	}
 
 	/**
@@ -198,32 +191,33 @@ export class DotNetBinaryReader extends BinaryReader
 	 * @author Loren Goodwin
 	 * @author Proddy
 	 */
-	static async readSerializationStream(serializationStream)
+	read()
 	{
-		const binaryReader = new DotNetBinaryReader(serializationStream);
-	
-		// Note: Gets the type of the record at the start of the stream without
-		//	advancing the position
-		let recordType = binaryReader.view.getUint8();
-	
-		/** @type {BinaryFormatterData} */
-		const data = {};
+		/**
+		 * An array of all records in the serialization stream.
+		 * 
+		 * @type {Array}
+		 */
+		const records = [];
 		
 		// eslint-disable-next-line no-constant-condition
 		while(true)
 		{
+			let recordType = this.readInt8();
+
 			switch (recordType)
 			{
 				case DotNetBinaryReader.RecordTypeEnumeration.SerializedStreamHeader:
-					data.serializedStreamHeader = binaryReader.#readSerializedStreamHeader();
+					records.push(this.#readSerializationHeader(records));
 					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ClassWithId:
-					throw new Error("Record type not implemented:", recordType);
+					records.push(this.#readClassWithId(records));
+					break;
 
-				case DotNetBinaryReader.RecordTypeEnumeration.SystemClassWithMembers:
-					throw new Error("Record type not implemented:", recordType);
-				
+				case DotNetBinaryReader.RecordTypeEnumeration.SystemClassWithMembers:			
+					throw new Error("Record type not implemented:", recordType);	
+
 				case DotNetBinaryReader.RecordTypeEnumeration.ClassWithMembers:
 					throw new Error("Record type not implemented:", recordType);
 
@@ -231,29 +225,32 @@ export class DotNetBinaryReader extends BinaryReader
 					throw new Error("Record type not implemented:", recordType);
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ClassWithMembersAndTypes:
-					data.classWithMembersAndTypes = binaryReader.#readClassWithMembersAndTypes();
+					records.push(this.#readClassWithMembersAndTypes(records));
 					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.BinaryObjectString:
 					throw new Error("Record type not implemented:", recordType);
 
 				case DotNetBinaryReader.RecordTypeEnumeration.BinaryArray:
-					throw new Error("Record type not implemented:", recordType);
+					records.push(this.#readBinaryArray(records));
+					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.MemberPrimitiveTyped:
 					throw new Error("Record type not implemented:", recordType);
 
 				case DotNetBinaryReader.RecordTypeEnumeration.MemberReference:
-					throw new Error("Record type not implemented:", recordType);
+					records.push(this.#readMemberReference(records));
+					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ObjectNull:
 					throw new Error("Record type not implemented:", recordType);
 
 				case DotNetBinaryReader.RecordTypeEnumeration.MessageEnd:
-					return data;
+					console.log(`[DotNetBinaryReader] Reading MessageEnd record starting at position ${ this.position }`);
+					return records;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.BinaryLibrary:
-					data.binaryLibrary = binaryReader.#readBinaryLibrary();
+					records.push(this.#readBinaryLibrary(records));
 					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ObjectNullMultiple256:
@@ -263,7 +260,8 @@ export class DotNetBinaryReader extends BinaryReader
 					throw new Error("Record type not implemented:", recordType);
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ArraySinglePrimitive:
-					throw new Error("Record type not implemented:", recordType);
+					records.push(this.#readArraySinglePrimitive(records));
+					break;
 
 				case DotNetBinaryReader.RecordTypeEnumeration.ArraySingleObject:
 					throw new Error("Record type not implemented:", recordType);
@@ -279,10 +277,137 @@ export class DotNetBinaryReader extends BinaryReader
 
 				default:
 					throw new TypeError("Invalid record type:", recordType);
-			}
-		
-			recordType = binaryReader.readUInt8();		
+			}	
 		}
+	}
+
+	//
+	// General Functions
+	//
+
+	/**
+	 * Reads an ArrayInfo structure.
+	 * 
+	 * @returns {ArrayInfo}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A113%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C347%2C0%5D
+	 */
+	#readArrayInfo()
+	{
+		const arrayInfo = {};
+
+		arrayInfo.ObjectId = this.readInt32();
+
+		// TODO: Validate that ObjectId is unique from all other ObjectIds
+
+		arrayInfo.Length = this.readInt32();
+
+		assert(arrayInfo.Length >= 0, "ArrayInfo Length must be a positive integer.");
+
+		return arrayInfo;
+	}
+
+	/**
+	 * Reads the appropriate value type for the given BinaryTypeEnum.
+	 * 
+	 * @param {BinaryTypeEnum} BinaryTypeEnum
+	 * @returns {*}
+	 */
+	#readBinaryType(BinaryTypeEnum)
+	{
+		switch(BinaryTypeEnum)
+		{
+			case DotNetBinaryReader.BinaryTypeEnumeration.Primitive:
+				return this.readUInt8();
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.String:
+				return null;
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.Object:
+				return null;
+
+			// TODO
+			case DotNetBinaryReader.BinaryTypeEnumeration.SystemClass:
+				throw new Error("SystemClass AdditionalInfos not implemented.");
+
+			// TODO
+			case DotNetBinaryReader.BinaryTypeEnumeration.Class:
+			{
+				const ClassTypeInfo =
+				{
+					TypeName: this.readString(),
+					LibraryId: this.readInt32(),
+				};
+
+				// TODO: Validate that the LibraryId exists in a BinaryLibrary record read before this record
+
+				return ClassTypeInfo;
+			}
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.ObjectArray:
+				return null;
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.StringArray:
+				return null;
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
+				return this.readUInt8();
+		}
+	}
+	
+	/**
+	 * Reads a ClassInfo structure.
+	 * 
+	 * @returns {ClassInfo}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A97%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C371%2C0%5D
+	 */
+	#readClassInfo()
+	{
+		const classInfo = {};
+
+		classInfo.ObjectId = this.readUInt32();
+		classInfo.Name = this.readString();
+		classInfo.MemberCount = this.readUInt32();
+
+		assert(classInfo.MemberCount > 0, `Invalid ClassWithMembersAndTypes member count: ${ classInfo.MemberCount }`);
+
+		classInfo.MemberNames = [];
+
+		for(let i = 0; i < classInfo.MemberCount; i++)
+		{
+			classInfo.MemberNames.push(this.readString());
+		}
+
+		return classInfo;
+	}
+
+	/**
+	 * Reads a MemberTypeInfo structure.
+	 * 
+	 * @param {ClassInfo} classInfo
+	 */
+	#readMemberTypeInfo(classInfo)
+	{
+		const memberTypeInfo = {};
+
+		memberTypeInfo.BinaryTypeEnums = [];
+
+		for(let i = 0; i < classInfo.MemberCount; i++)
+		{
+			memberTypeInfo.BinaryTypeEnums.push(this.readUInt8());
+		}
+
+		memberTypeInfo.AdditionalInfos = [];
+
+		for(let i = 0; i < classInfo.MemberCount; i++)
+		{
+			const binaryTypeEnum = memberTypeInfo.BinaryTypeEnums[i];
+
+			memberTypeInfo.AdditionalInfos.push(this.#readBinaryType(binaryTypeEnum));
+		}
+
+		return memberTypeInfo;
 	}
 	
 	/**
@@ -294,7 +419,7 @@ export class DotNetBinaryReader extends BinaryReader
 	 * @author Loren Goodwin
 	 * @author Proddy
 	 */
-	readPrimitive(type)
+	#readPrimitive(type)
 	{
 		switch (type)
 		{
@@ -357,267 +482,269 @@ export class DotNetBinaryReader extends BinaryReader
 		}
 	}
 
-	/**
-	 * Reads the serialization header.
-	 * 
-	 * @returns {SerializedStreamHeader}
-	 * @author Loren Goodwin
-	 * @author Proddy
-	 */
-	#readSerializedStreamHeader()
-	{
-		/** @type {SerializedStreamHeader} */
-		const serializationHeader =
-		{
-			rootId: this.readUInt32(),
-			headerId: this.readUInt32(),
-			majorVersion: this.readUInt32(),
-			minorVersion: this.readUInt32(),
-		};
+	//
+	// Record Functions
+	//
 
-		return serializationHeader;
+	/**
+	 * Reads an ArraySinglePrimitive record.
+	 * 
+	 * @param {Array} previousRecords An array of records read before this one.
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A122%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C196%2C0%5D
+	 */
+	#readArraySinglePrimitive(previousRecords)
+	{
+		console.log(`[DotNetBinaryReader] Reading ArraySinglePrimitive record starting at position ${ this.position }`);
+
+		const record = {};
+
+		record.RecordTypeEnum = DotNetBinaryReader.RecordTypeEnumeration.ArraySinglePrimitive;
+
+		record.ArrayInfo = this.#readArrayInfo();
+
+		record.PrimitiveTypeEnum = this.readInt8();
+
+		assert(record.PrimitiveTypeEnum >= 0 && record.PrimitiveTypeEnum <= 16, "ArraySinglePrimitive PrimitiveTypeEnum invalid.");
+
+		return record;
+	}
+
+	/**
+	 * Reads a BinaryArray record.
+	 * 
+	 * @param {Array} previousRecords
+	 * @returns {BinaryArray}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A118%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C722%2C0%5D
+	 */
+	#readBinaryArray(previousRecords)
+	{
+		console.log(`[DotNetBinaryReader] Reading BinaryArray record starting at position ${ this.position }`);
+
+		const record = {};
+
+		record.RecordTypeEnum = DotNetBinaryReader.RecordTypeEnumeration.BinaryArray;
+
+		record.ObjectId = this.readInt32();
+
+		// TODO: Verify that the ObjectId has NOT been used already in the previous records
+
+		record.BinaryArrayTypeEnum = this.readInt8();
+
+		assert(record.BinaryArrayTypeEnum >= 0 && record.BinaryArrayTypeEnum <= 5, `Invalid BinaryArrayTypeEnum: ${ record.BinaryArrayTypeEnum }`);
+
+		record.Rank = this.readInt32();
+
+		assert(record.Rank > 0, "BinaryArray Rank must be a positive integer.");
+
+		record.Lengths = [];
+
+		for(let i = 0; i < record.Rank; i++)
+		{
+			record.Lengths.push(this.readInt32());
+		}
+
+		assert(record.Rank == record.Lengths.length, "BinaryArray Rank must equal the number of Lengths.");
+
+		if 
+		(
+			record.BinaryArrayTypeEnum == DotNetBinaryReader.BinaryArrayTypeEnumeration.SingleOffset ||
+			record.BinaryArrayTypeEnum == DotNetBinaryReader.BinaryArrayTypeEnumeration.JaggedOffset ||
+			record.BinaryArrayTypeEnum == DotNetBinaryReader.BinaryArrayTypeEnumeration.RectangularOffset
+		)
+		{
+			record.LowerBounds = [];
+	
+			for(let i = 0; i < record.Rank; i++)
+			{
+				record.LowerBounds.push(this.readInt32());
+			}
+		}
+
+		record.TypeEnum = this.readInt8();
+
+		assert(
+			(record.TypeEnum >= 0 && record.TypeEnum <= 22) && !(record.TypeEnum >= 18 && record.TypeEnum <= 20),
+			"BinaryArray TypeEnum invalid.");
+
+		record.AdditionalTypeInfo = this.#readBinaryType(record.TypeEnum);
+
+		// TODO: READ ARRAY VALUES
+
+		return record;
 	}
 
 	/**
 	 * Reads the binary library.
 	 * 
+	 * @param {Array} previousRecords An array of records read before this one.
 	 * @returns {BinaryLibrary}
 	 * @author Loren Goodwin
 	 * @author Proddy
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A140%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C394%2C0%5D
 	 */
-	#readBinaryLibrary()
+	#readBinaryLibrary(previousRecords)
 	{
-		/** @type {BinaryLibrary} */
-		const binaryLibrary =
+		console.log(`[DotNetBinaryReader] Reading BinaryLibrary record starting at position ${ this.position }`);
+
+		const record =
 		{
-			id: this.readUInt32(),
-			name: this.readString(),
+			RecordTypeEnum: DotNetBinaryReader.RecordTypeEnumeration.BinaryLibrary,
+
+			LibraryId: this.readUInt32(),
+			LibraryName: this.readString(),
 		};
 
-		return binaryLibrary;
+		// TODO: Validate that the LibraryId has NOT already been used in any previous records.
+
+		assert(record.LibraryId > 0, `Invalid BinaryLibrary LibraryId: ${ record.libraryId } (MUST be a positive integer)`);
+
+		return record;
 	}
 
 	/**
-	 * Reads the serialized class.
+	 * Reads a ClassWithId record.
 	 * 
+	 * @param {Array} previousRecords An array of records read before this one.
+	 * @returns {ClassWithId}
+	 * @author Loren Goodwin
+	 */
+	#readClassWithId(previousRecords)
+	{
+		console.log(`[DotNetBinaryReader] Reading ClassWithId record starting at position ${ this.position }`);
+
+		const record = {};
+
+		record.RecordTypeEnum = DotNetBinaryReader.RecordTypeEnumeration.ClassWithId;
+
+		record.ObjectId = this.readInt32();
+
+		// TODO: Validate that this object ID is unique from all other records
+
+		record.MetadataId = this.readInt32();
+
+		// TODO: Validate the following
+		// An INT32 value (as specified in [MS-DTYP] section 2.2.22) that references
+		// one of the other Class records by its ObjectId. A SystemClassWithMembers,
+		// SystemClassWithMembersAndTypes, ClassWithMembers, or ClassWithMembersAndTypes record
+		// with the value of this field in its ObjectId field MUST appear earlier in the serialization stream.
+
+		return record;
+	}
+
+	/**
+	 * Reads a ClassWithMembersAndTypes record.
+	 * 
+	 * @param {Array} previousRecords An array of records read before this one.
 	 * @returns {ClassWithMembersAndTypes}
 	 * @author Loren Goodwin
 	 * @author Proddy
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A103%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C479%2C0%5D
 	 */
-	#readClassWithMembersAndTypes()
+	#readClassWithMembersAndTypes(previousRecords)
 	{
-		/** @type {ClassWithMembersAndTypes} */
-		const serializedClass = 
+		console.log(`[DotNetBinaryReader] Reading ClassWithMembersAndTypes record starting at position ${ this.position }`);
+
+		const record = {};
+
+		//
+		// RecordTypeEnum
+		//
+
+		record.RecordTypeEnum = DotNetBinaryReader.RecordTypeEnumeration.ClassWithMembersAndTypes;
+
+		//
+		// ClassInfo
+		//
+
+		record.ClassInfo = this.#readClassInfo();
+
+		//
+		// MemberTypeInfo
+		//
+
+		record.MemberTypeInfo = this.#readMemberTypeInfo(record.ClassInfo);
+
+		//
+		// Library ID
+		//
+
+		record.LibraryId = this.readUInt32();
+
+		// TODO: Validate that a BinaryLibrary with the same LibraryId exists in previousRecords
+
+		//
+		// Values
+		//
+
+		// TODO: THIS
+
+		return record;
+	}
+
+	/**
+	 * Reads a MemberReference record.
+	 * 
+	 * @param {Array} previousRecords An array of records read before this one.
+	 * @returns {MemberReference}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A129%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C335%2C0%5D
+	 */
+	#readMemberReference(previousRecords)
+	{
+		console.log(`[DotNetBinaryReader] Reading MemberReference record starting at position ${ this.position }`);
+
+		const record =
 		{
-			objectId: this.readUInt32(),
-			name: this.readString(),
-			memberCount: this.readUInt32(),
+			RecordTypeEnum: DotNetBinaryReader.RecordTypeEnumeration.MemberReference,
+			IdRef: this.readInt32(),
 		};
 
-		// Read Member Names
-		serializedClass.memberNames = this.#readClassWithMembersAndTypesMemberNames(serializedClass.memberCount);
+		assert(record.IdRef >= 0, "MemberReference IdRef MUST be a positive integer.");
+		
+		// TODO: Something for this requirement:
+		//
+		// A Class, Array, or BinaryObjectString record MUST exist in the serialization stream with the
+		// value as its ObjectId. Unlike other ID references, there is no restriction on where the record
+		// that defines the ID appears in the serialization stream; that is, it MAY appear after the
+		// referencing record.<9>
 
-		// Read Member Types
-		serializedClass.memberTypes = this.#readClassWithMembersAndTypesMemberTypes(serializedClass.memberCount);
-
-		// Read Library ID
-		// 	NOTE: If this isn't 2, the file is fucked
-		//	Should probably do error handling here
-		//	Josh said this is an identifier that explains how to read the rest of the file
-		serializedClass.libraryId = this.readUInt32();
-
-		// Read Member Values
-		serializedClass.memberValues = this.#readClassWithMembersAndTypesMemberValues(serializedClass.memberCount, serializedClass.memberTypes);
-
-		return serializedClass;
-	} 
-
-	/**
-	 * Reads the serialized class' member names.
-	 * 
-	 * @param {Number} memberCount
-	 * @returns {Array<String>}
-	 * @author Loren Goodwin
-	 * @author Proddy
-	 */
-	#readClassWithMembersAndTypesMemberNames(memberCount)
-	{
-		const memberNames = [];
-
-		for(let i = 0; i < memberCount; i++)
-		{
-			memberNames.push(this.readString());
-		}
-
-		return memberNames;
+		return record;
 	}
 
 	/**
-	 * Reads the serialized class' member types.
+	 * Reads a SerializationHeader record.
 	 * 
-	 * @param {Number} memberCount 
-	 * @returns {Array<SerializedClassMemberType>}
+	 * @param {Array} previousRecords An array of records read before this one.
+	 * @returns {SerializationHeaderRecord}
 	 * @author Loren Goodwin
 	 * @author Proddy
 	 */
-	#readClassWithMembersAndTypesMemberTypes(memberCount)
+	#readSerializationHeader(previousRecords)
 	{
-		const memberTypes = [];
-
-		for(let i = 0; i < memberCount; i++)
+		console.log(`[DotNetBinaryReader] Reading SerializationHeader record starting at position ${ this.position }`);
+		
+		const record =
 		{
-			/** @type {SerializedClassMemberType} */
-			const type =
-			{
-				id: this.readUInt8(),
-				additionalInfo: undefined,
-			};
+			RecordTypeEnum: DotNetBinaryReader.RecordTypeEnumeration.SerializedStreamHeader,
 
-			memberTypes.push(type);
-		}
+			RootId: this.readInt32(),
+			HeaderId: this.readInt32(),
+			MajorVersion: this.readInt32(),
+			MinorVersion: this.readInt32(),
+		};
 
-		for (let i = 0; i < memberCount; i++)
-		{
-			/** @type {SerializedClassMemberType} */
-			const type = memberTypes[i];
+		// TODO: Validate RootId
+		//	See https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A136%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C431%2C0%5D
 
-			switch(type.id)
-			{
-				case 0:
-				case 7:
-					type.additionalInfo = this.readUInt8();
+		// TODO: Validate HeaderId
+		// 	See https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A136%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C431%2C0%5D
+		
+		assert(record.MajorVersion == 1, `Invalid serialized stream header major version: ${ record.MajorVersion }`);
 
-					break;
+		assert(record.MinorVersion == 0, `Invalid SerializedStreamHeader MinorVersion: ${ record.MinorVersion }`);
 
-				case 1:
-					// No Additional Data, Do Nothing
-					break;
-
-				case 3:
-					type.additionalInfo = this.readString();	
-
-					break;
-
-				case 4:
-					type.additionalInfo = 
-					{
-						name: this.readString(),
-						libraryId: this.readUInt8(),
-					};
-
-					break;
-
-				default:
-					throw new Error("Unexpected member type:", type.id);
-			}
-		}
-
-		return memberTypes;
-	}
-
-	/**
-	 * Reads the serialized class' member values.
-	 * 
-	 * @param {Number} memberCount 
-	 * @param {Array<SerializedClassMemberType>} memberTypes 
-	 * @returns {Array<SerializedClassMemberValue>}
-	 * @author Loren Goodwin
-	 * @author Proddy
-	 */
-	#readClassWithMembersAndTypesMemberValues(memberCount, memberTypes)
-	{
-		const memberValues = [];
-
-		// Read Member Values
-		for(let i = 0; i < memberCount; i++)
-		{
-			const type = memberTypes[i];
-
-			const value = {};
-
-			switch (type.id)
-			{
-				case DotNetBinaryReader.BinaryTypeEnumeration.Primitive: 
-					value.value = this.readPrimitive(type.additionalInfo);	
-					break;
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.String:
-					// TODO: Look into this, this code seems wrong...
-					//	See: https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A66%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C670%2C0%5D
-					value.recordType = this.readUInt8();
-
-					if (value.recordType != 6)
-					{
-						throw new Error("Unknown string record type:", value.recordType);
-					}
-
-					value.objectId = this.readUInt32();
-
-					value.value = this.readString();
-
-					break;
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.Object:
-					throw new Error("Object not implemented.");
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.SystemClass:
-					throw new Error("SystemClass not implemented.");
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.Class:
-					throw new Error("Class not implemented.");
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.ObjectArray:
-					throw new Error("ObjectArray not implemented.");
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.StringArray:
-					throw new Error("StringArray not implemented.");
-
-				case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
-					value.recordType = this.readUInt8();
-					value.index = this.readUInt32();
-
-					break;
-
-				default:
-					throw new Error("Invalid member type:", type.id);
-			}
-
-			memberValues.push(value);
-		}
-
-		// Read Array Member Values
-		for(let i = 0; i < memberCount; i++)
-		{
-			const type = memberTypes[i];
-
-			if (type.id != 7)
-			{
-				continue;
-			}
-
-			const value = memberValues[i];
-
-			// Note: Skip over padding
-			do
-			{
-				value.recordType = this.readUInt8();
-			}
-			while(value.recordType == 0);
-
-			value.id = this.readUInt32();
-
-			value.length = this.readUInt32();
-
-			value.primitiveType = this.readUInt8();
-
-			value.value = [];
-
-			for(let i = 0; i < value.length; i++)
-			{
-				value.value.push(this.readPrimitive(value.primitiveType));
-			}
-		}
-
-		return memberValues;
+		return record;
 	}
 }
