@@ -23,15 +23,7 @@ A `_JSON_DUMP` folder will be created in the save directory.
 This tool should work on Windows and Linux.
 
 ## Status
-Currently, you can **only partially dump** your save data. The tool is only capable of dumping the following 5 dat files for now:
-
-- `date.dat`
-- `levels.dat`
-- `mapIcons.dat`
-- `playerInfo.dat`
-- `townStatus.dat`
-
-There is not currently any way to convert the dumped files back.
+Currently, you can **only partially dump** your save data. Files that cannot be dumped will not have a corresponding JSON file in the `_JSON_DUMP` folder.
 
 Furthermore, the files are currently dumped as essentially one-to-one representations of the Microsoft .NET BinaryFormatter file format that the game uses. I intend to improve upon this in the future after converting the data.
 
