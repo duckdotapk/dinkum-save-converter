@@ -344,10 +344,11 @@ export class DotNetBinaryReader extends BinaryReader
 					throw new Error("Not implemented.");
 
 				case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
-					break;
+					throw new Error("Not implemented.");
 			}
 		}
 
+		/*
 		for(let i = 0; i < record.ClassInfo.MemberCount; i++)
 		{
 			const binaryTypeEnum = record.MemberTypeInfo.BinaryTypeEnums[i];
@@ -361,12 +362,9 @@ export class DotNetBinaryReader extends BinaryReader
 				continue;
 			}
 
-			const _ =	this.readInt8();
-
-			const arrayInfo = this.#readArrayInfo();
-
 			debugger;
 		}
+		*/
 
 		return memberValues;
 	}
