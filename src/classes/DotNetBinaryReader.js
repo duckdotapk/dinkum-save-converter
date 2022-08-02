@@ -10,48 +10,7 @@ import { BinaryReader } from "./BinaryReader.js";
 // Type Definitions
 //
 
-
-/**
- * @typedef {Object} SerializationHeaderRecord
- * @property {Number} RecordType
- * @property {Number} RootId
- * @property {Number} HeaderId
- * @property {Number} MajorVersion
- * @property {Number} MinorVersion
- */
-
-/**
- * @property {Number} RecordType
- * @typedef {Object} BinaryLibrary
- * @property {Number} LibraryId
- * @property {String} LibraryName
- */
-
-/**
- * @typedef {Object} ClassWithMembersAndTypes
- * @property {Number} objectId
- * @property {String} name The name of the class that was serialized.
- * @property {Number} memberCount The count of members in this class.
- * @property {Array<String>} memberNames An array of all of the names of this class' members.
- * @property {Array<SerializedClassMemberType>} memberTypes Type information for the class' members.
- * @property {Array<SerializedClassMemberValue>} memberValues The values for each member.
- */
-
-/**
- * @typedef {Object} SerializedClassMemberType
- * @property {Number} id
- * @property {Number|SerializedClassMemberTypeDetails} additionalInfo
- */
-
-/**
- * @typedef {Object} SerializedClassMemberTypeDetails
- * @property {String} name
- * @property {Number} libraryId
- */
-
-/**
- * @typedef {Object} SerializedClassMemberValue
- */
+// TODO
 
 //
 // Exports
@@ -385,8 +344,28 @@ export class DotNetBinaryReader extends BinaryReader
 					throw new Error("Not implemented.");
 
 				case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
-					throw new Error("Not implemented.");
+					break;
 			}
+		}
+
+		for(let i = 0; i < record.ClassInfo.MemberCount; i++)
+		{
+			const binaryTypeEnum = record.MemberTypeInfo.BinaryTypeEnums[i];
+			const additionalInfo = record.MemberTypeInfo.AdditionalInfos[i];
+
+			if
+			(
+				binaryTypeEnum != DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray
+			)
+			{
+				continue;
+			}
+
+			const _ =	this.readInt8();
+
+			const arrayInfo = this.#readArrayInfo();
+
+			debugger;
 		}
 
 		return memberValues;
