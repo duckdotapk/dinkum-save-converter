@@ -290,7 +290,7 @@ export class DotNetBinaryReader extends BinaryReader
 	 * @param {BinaryTypeEnum} binaryTypeEnum
 	 * @returns {*}
 	 */
-	#readBinaryType(binaryTypeEnum)
+	#readAdditionalInfo(binaryTypeEnum)
 	{
 		switch(binaryTypeEnum)
 		{
@@ -335,6 +335,61 @@ export class DotNetBinaryReader extends BinaryReader
 		const int = this.readInt8();
 
 		return String.fromCharCode(int);
+	}
+
+	/**
+	 * Reads class member values according to the given class record's specifications.
+	 * 
+	 * @param {ClassRecord} record Any kind of class record.
+	 * @returns {Array}
+	 * @author Loren Goodwin
+	 */
+	#readClassMemberValues(record)
+	{
+		const memberValues = [];
+
+		for(let i = 0; i < record.ClassInfo.MemberCount; i++)
+		{
+			const binaryTypeEnum = record.MemberTypeInfo.BinaryTypeEnums[i];
+			const additionalInfo = record.MemberTypeInfo.AdditionalInfos[i];
+
+			switch(binaryTypeEnum)
+			{
+				case DotNetBinaryReader.BinaryTypeEnumeration.Primitive:
+					memberValues[i] = this.#readPrimitive(additionalInfo);
+					break;
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.String:
+					memberValues[i] = this.#readLengthPrefixedString;
+					break;
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.Object:
+					throw new Error("Not implemented.");
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.SystemClass:
+					throw new Error("Not implemented.");
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.Class:
+					memberValues[i] =
+					{
+						RecordTypeEnum: this.readInt8(),
+						IdRef: this.readInt32(),
+					};
+					
+					break;
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.ObjectArray:
+					throw new Error("Not implemented.");
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.StringArray:
+					throw new Error("Not implemented.");
+
+				case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
+					throw new Error("Not implemented.");
+			}
+		}
+
+		return memberValues;
 	}
 
 	/**
@@ -415,7 +470,6 @@ export class DotNetBinaryReader extends BinaryReader
 
 			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int64:
 				return this.readInt64();
-
 		
 			case DotNetBinaryReader.PrimitiveTypeEnumeration.SByte:
 				return this.readInt8();
@@ -556,7 +610,7 @@ export class DotNetBinaryReader extends BinaryReader
 		{
 			const binaryTypeEnum = memberTypeInfo.BinaryTypeEnums[i];
 
-			memberTypeInfo.AdditionalInfos.push(this.#readBinaryType(binaryTypeEnum));
+			memberTypeInfo.AdditionalInfos.push(this.#readAdditionalInfo(binaryTypeEnum));
 
 			// TODO: "When the BinaryTypeEnum value is Primitive, the PrimitiveTypeEnumeration value in AdditionalInfo MUST NOT be Null (17) or String (18)."
 		}
@@ -650,7 +704,7 @@ export class DotNetBinaryReader extends BinaryReader
 			(record.TypeEnum >= 0 && record.TypeEnum <= 22) && !(record.TypeEnum >= 18 && record.TypeEnum <= 20),
 			"BinaryArray TypeEnum invalid.");
 
-		record.AdditionalTypeInfo = this.#readBinaryType(record.TypeEnum);
+		record.AdditionalTypeInfo = this.#readAdditionalInfo(record.TypeEnum);
 
 		// TODO: READ ARRAY VALUES
 
@@ -706,11 +760,30 @@ export class DotNetBinaryReader extends BinaryReader
 
 		record.MetadataId = this.readInt32();
 
-		// TODO: Validate the following
-		// An INT32 value (as specified in [MS-DTYP] section 2.2.22) that references
-		// one of the other Class records by its ObjectId. A SystemClassWithMembers,
-		// SystemClassWithMembersAndTypes, ClassWithMembers, or ClassWithMembersAndTypes record
-		// with the value of this field in its ObjectId field MUST appear earlier in the serialization stream.
+		let relevantClassRecord;
+
+		for (const previousRecord of previousRecords)
+		{
+			if 
+			(
+				previousRecord.RecordTypeEnum != DotNetBinaryReader.RecordTypeEnumeration.SystemClassWithMembers &&
+				previousRecord.RecordTypeEnum != DotNetBinaryReader.RecordTypeEnumeration.SystemClassWithMembersAndTypes &&
+				previousRecord.RecordTypeEnum != DotNetBinaryReader.RecordTypeEnumeration.ClassWithMembers &&
+				previousRecord.RecordTypeEnum != DotNetBinaryReader.RecordTypeEnumeration.ClassWithMembersAndTypes
+			)
+			{
+				continue;
+			}
+
+			if (previousRecord.ClassInfo.ObjectId == record.MetadataId)
+			{
+				relevantClassRecord = previousRecord;
+			}
+		}
+
+		assert(relevantClassRecord, "ClassWithId MetadataId refers to a class record that did not preceed it.");
+
+		record.MemberValues = this.#readClassMemberValues(relevantClassRecord);
 
 		return record;
 	}
@@ -760,7 +833,7 @@ export class DotNetBinaryReader extends BinaryReader
 		// Values
 		//
 
-		// TODO: THIS
+		record.MemberValues = this.#readClassMemberValues(record);
 
 		return record;
 	}
