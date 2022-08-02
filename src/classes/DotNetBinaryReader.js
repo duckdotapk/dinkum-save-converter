@@ -275,7 +275,7 @@ export class DotNetBinaryReader extends BinaryReader
 					throw new Error("Record type not implemented:", recordType);
 
 				default:
-					throw new TypeError("Invalid record type:", recordType);
+					throw new TypeError(`Invalid record type: ${ recordType }`);
 			}	
 		}
 	}
