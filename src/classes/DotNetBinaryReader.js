@@ -360,7 +360,7 @@ export class DotNetBinaryReader extends BinaryReader
 					break;
 
 				case DotNetBinaryReader.BinaryTypeEnumeration.String:
-					memberValues[i] = this.#readLengthPrefixedString;
+					memberValues[i] = this.#readLengthPrefixedString();
 					break;
 
 				case DotNetBinaryReader.BinaryTypeEnumeration.Object:
@@ -520,7 +520,7 @@ export class DotNetBinaryReader extends BinaryReader
 		arrayInfo.ObjectId = this.readInt32();
 
 		assert(
-			arrayInfo.ObjectId > 0 && Number.isInteger(arrayInfo.objectId),
+			arrayInfo.ObjectId > 0 && Number.isInteger(arrayInfo.ObjectId),
 			"ArrayInfo ObjectId MUST be a positive integer.");
 
 		// TODO: Validate that ObjectId is unique from all other ObjectIds
