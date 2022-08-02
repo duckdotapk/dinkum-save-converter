@@ -177,39 +177,4 @@ export class BinaryReader
 
 		return float;
 	}
-
-	/**
-	 * Reads a char.
-	 * 
-	 * @returns {String}
-	 * @author Loren Goodwin
-	 */
-	readChar()
-	{
-		const int = this.readUInt8();
-
-		return String.fromCharCode(int);
-	}
-
-	/**
-	 * Reads a string.
-	 * 
-	 * This function assumes the next byte is a string length followed by the bytes of the string.
-	 * 
-	 * @returns {String}
-	 * @author Loren Goodwin
-	 */
-	readString() 
-	{
-		const length = this.readUInt8();
-
-		let buffer = [];
-
-		for (let i = 0; i < length; i++) 
-		{
-			buffer.push(this.readUInt8());
-		}
-	
-		return String.fromCharCode.apply(String, buffer);
-	}
 }

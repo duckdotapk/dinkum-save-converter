@@ -184,10 +184,9 @@ export class DotNetBinaryReader extends BinaryReader
 	}
 
 	/**
-	 * Parses the given ArrayBuffer as a serialization stream created with a Microsoft .NET BinaryFormatter.
+	 * Reads the entire file.
 	 * 
-	 * @param {ArrayBuffer} serializationStream
-	 * @returns {BinaryFormatterData}
+	 * @returns {Array}
 	 * @author Loren Goodwin
 	 * @author Proddy
 	 */
@@ -282,7 +281,175 @@ export class DotNetBinaryReader extends BinaryReader
 	}
 
 	//
-	// General Functions
+	// Value Functions
+	//
+
+	/**
+	 * Reads the appropriate value type for the given BinaryTypeEnum.
+	 * 
+	 * @param {BinaryTypeEnum} binaryTypeEnum
+	 * @returns {*}
+	 */
+	#readBinaryType(binaryTypeEnum)
+	{
+		switch(binaryTypeEnum)
+		{
+			// TODO: Validate that this int is in PrimitiveTypeEnumeration
+			case DotNetBinaryReader.BinaryTypeEnumeration.Primitive:
+				return this.readInt8();
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.String:
+				return null;
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.Object:
+				return null;
+
+			// TODO
+			case DotNetBinaryReader.BinaryTypeEnumeration.SystemClass:
+				throw new Error("SystemClass AdditionalInfos not implemented.");
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.Class:
+				return this.#readClassTypeInfo();
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.ObjectArray:
+				return null;
+
+			case DotNetBinaryReader.BinaryTypeEnumeration.StringArray:
+				return null;
+
+			// TODO: Validate that this int is in PrimitiveTypeEnumeration
+			case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
+				return this.readInt8();
+		}
+	}
+
+	/**
+	 * Reads a Char.
+	 * 
+	 * @returns {String}
+	 * @author Loren Goodwin
+	 */
+	#readChar()
+	{
+		// TODO: Actually fucking read Unicode characters, they can be multiple bytes!!!
+		const int = this.readInt8();
+
+		return String.fromCharCode(int);
+	}
+
+	/**
+	 * Reads a Decimal value.
+	 * 
+	 * @returns {String}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A69%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C647%2C0%5D
+	 */
+	#readDecimal()
+	{
+		const decimal = this.#readLengthPrefixedString();
+
+		// TODO: Fucking more shit here
+		//	See documentation for Decimal
+
+		return decimal;
+	}
+
+	/**
+	 * Reads a length prefixed string.
+	 * 
+	 * This function assumes the next byte is a string length followed by the bytes of the string.
+	 * 
+	 * @returns {String}
+	 * @author Loren Goodwin
+	 */
+	#readLengthPrefixedString() 
+	{
+		const length = this.readUInt8();
+
+		let buffer = [];
+
+		for (let i = 0; i < length; i++) 
+		{
+			buffer.push(this.readUInt8());
+		}
+	
+		return String.fromCharCode.apply(String, buffer);
+	}
+	
+	/**
+	 * Reads a primitive value.
+	 * 
+	 * @param {Number} type The type of primitive to read.
+	 * @returns {Number|String}
+	 * @author Loren Goodwin
+	 * @author Proddy
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A77%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C625%2C0%5D
+	 */
+	#readPrimitive(type)
+	{
+		switch (type)
+		{
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Boolean:
+				return this.readInt8() != 0;
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Byte:
+				return this.readUInt8();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Char:
+				return this.#readChar();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Unused:
+				throw new Error("Invalid primitive type:", type);
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Decimal:
+				return this.#readDecimal();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Double:
+				return this.readFloat64();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int16:
+				return this.readInt16();
+			
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int32:
+				return this.readInt32();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int64:
+				return this.readInt64();
+
+		
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.SByte:
+				return this.readInt8();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Single:
+				return this.readFloat32();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.TimeSpan:
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.DateTime:
+				return this.readInt64();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt16:
+				return this.readUInt16();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt32:
+				return this.readUInt32();
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt64:
+				return this.readUInt64();
+
+			// TODO: implement this
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.Null:
+				throw new Error("Unimplemented primitive type:", type);
+
+			case DotNetBinaryReader.PrimitiveTypeEnumeration.String:
+				return this.#readLengthPrefixedString();
+
+			default:
+				throw new Error("Invalid primitive type:", type);
+		}
+	}
+
+	//
+	// Structure Functions
 	//
 
 	/**
@@ -298,61 +465,39 @@ export class DotNetBinaryReader extends BinaryReader
 
 		arrayInfo.ObjectId = this.readInt32();
 
+		assert(
+			arrayInfo.ObjectId > 0 && Number.isInteger(arrayInfo.objectId),
+			"ArrayInfo ObjectId MUST be a positive integer.");
+
 		// TODO: Validate that ObjectId is unique from all other ObjectIds
 
 		arrayInfo.Length = this.readInt32();
 
-		assert(arrayInfo.Length >= 0, "ArrayInfo Length must be a positive integer.");
+		assert(
+			arrayInfo.Length >= 0 && Number.isInteger(arrayInfo.Length), 
+			"ArrayInfo Length MUST be 0 or a positive integer.");
 
 		return arrayInfo;
 	}
 
 	/**
-	 * Reads the appropriate value type for the given BinaryTypeEnum.
+	 * Reads a ClassTypeInfo structure.
 	 * 
-	 * @param {BinaryTypeEnum} BinaryTypeEnum
-	 * @returns {*}
+	 * @returns {ClassTypeInfo}
+	 * @author Loren Goodwin
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A69%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C214%2C0%5D
 	 */
-	#readBinaryType(BinaryTypeEnum)
+	#readClassTypeInfo()
 	{
-		switch(BinaryTypeEnum)
-		{
-			case DotNetBinaryReader.BinaryTypeEnumeration.Primitive:
-				return this.readUInt8();
+		const classTypeInfo = {};
 
-			case DotNetBinaryReader.BinaryTypeEnumeration.String:
-				return null;
+		classTypeInfo.TypeName = this.#readLengthPrefixedString();
 
-			case DotNetBinaryReader.BinaryTypeEnumeration.Object:
-				return null;
+		classTypeInfo.LibraryId = this.readInt32();
 
-			// TODO
-			case DotNetBinaryReader.BinaryTypeEnumeration.SystemClass:
-				throw new Error("SystemClass AdditionalInfos not implemented.");
+		// TODO: Validate that the LibraryId exists in a BinaryLibrary record read before this record
 
-			// TODO
-			case DotNetBinaryReader.BinaryTypeEnumeration.Class:
-			{
-				const ClassTypeInfo =
-				{
-					TypeName: this.readString(),
-					LibraryId: this.readInt32(),
-				};
-
-				// TODO: Validate that the LibraryId exists in a BinaryLibrary record read before this record
-
-				return ClassTypeInfo;
-			}
-
-			case DotNetBinaryReader.BinaryTypeEnumeration.ObjectArray:
-				return null;
-
-			case DotNetBinaryReader.BinaryTypeEnumeration.StringArray:
-				return null;
-
-			case DotNetBinaryReader.BinaryTypeEnumeration.PrimitiveArray:
-				return this.readUInt8();
-		}
+		return classTypeInfo;
 	}
 	
 	/**
@@ -366,17 +511,24 @@ export class DotNetBinaryReader extends BinaryReader
 	{
 		const classInfo = {};
 
-		classInfo.ObjectId = this.readUInt32();
-		classInfo.Name = this.readString();
-		classInfo.MemberCount = this.readUInt32();
+		classInfo.ObjectId = this.readInt32();
 
-		assert(classInfo.MemberCount > 0, `Invalid ClassWithMembersAndTypes member count: ${ classInfo.MemberCount }`);
+		// TODO: Validate that ObjectId is unique
+		// TODO: "If the ObjectId is referenced by a MemberReference record elsewhere in the serialization stream, the ObjectId MUST be positive"
+		
+		classInfo.Name = this.#readLengthPrefixedString();
+
+		classInfo.MemberCount = this.readInt32();
+
+		assert(
+			classInfo.MemberCount >= 0 && Number.isInteger(classInfo.MemberCount), 
+			`Invalid ClassWithMembersAndTypes member count: ${ classInfo.MemberCount }`);
 
 		classInfo.MemberNames = [];
 
 		for(let i = 0; i < classInfo.MemberCount; i++)
 		{
-			classInfo.MemberNames.push(this.readString());
+			classInfo.MemberNames.push(this.#readLengthPrefixedString());
 		}
 
 		return classInfo;
@@ -405,81 +557,11 @@ export class DotNetBinaryReader extends BinaryReader
 			const binaryTypeEnum = memberTypeInfo.BinaryTypeEnums[i];
 
 			memberTypeInfo.AdditionalInfos.push(this.#readBinaryType(binaryTypeEnum));
+
+			// TODO: "When the BinaryTypeEnum value is Primitive, the PrimitiveTypeEnumeration value in AdditionalInfo MUST NOT be Null (17) or String (18)."
 		}
 
 		return memberTypeInfo;
-	}
-	
-	/**
-	 * Reads a primitive value.
-	 * 
-	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A77%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C625%2C0%5D
-	 * @param {Number} type The type of primitive to read.
-	 * @returns {Number|String}
-	 * @author Loren Goodwin
-	 * @author Proddy
-	 */
-	#readPrimitive(type)
-	{
-		switch (type)
-		{
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Boolean:
-				return this.readUInt8() != 0;
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Byte:
-				return this.readUInt8();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Char:
-				return this.readChar();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Unused:
-				throw new Error("Invalid primitive type:", type);
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Decimal:
-				return this.readString();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Double:
-				return this.readFloat64();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int16:
-				return this.readInt16();
-			
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int32:
-				return this.readInt32();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Int64:
-				return this.readInt64();
-
-			
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.SByte:
-				return this.readInt8();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Single:
-				return this.readFloat32();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.TimeSpan:
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.DateTime:
-				return this.readInt64();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt16:
-				return this.readUInt16();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt32:
-				return this.readUInt32();
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.UInt64:
-				return this.readUInt64();
-
-			// TODO: implement this
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.Null:
-				throw new Error("Unimplemented primitive type:", type);
-
-			case DotNetBinaryReader.PrimitiveTypeEnumeration.String:
-				return this.readString();
-
-			default:
-				throw new Error("Invalid primitive type:", type);
-		}
 	}
 
 	//
@@ -593,7 +675,7 @@ export class DotNetBinaryReader extends BinaryReader
 			RecordTypeEnum: DotNetBinaryReader.RecordTypeEnumeration.BinaryLibrary,
 
 			LibraryId: this.readUInt32(),
-			LibraryName: this.readString(),
+			LibraryName: this.#readLengthPrefixedString(),
 		};
 
 		// TODO: Validate that the LibraryId has NOT already been used in any previous records.
