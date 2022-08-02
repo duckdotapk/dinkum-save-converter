@@ -78,6 +78,50 @@ export class DotNetBinaryReader extends BinaryReader
 		};
 
 	/**
+	 * An enumeration containing valid binary types.
+	 * 
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A75%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C434%2C0%5D
+	 */
+	static BinaryTypeEnumeration =
+		{
+			Primitive: 0,
+			String: 1,
+			Object: 2,
+			SystemClass: 3,
+			Class: 4,
+			ObjectArray: 5,
+			StringArray: 6,
+			PrimitiveArray: 7,
+		};
+	
+	/**
+	 * An enumeration containing valid primitive types.
+	 * 
+	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A77%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C625%2C0%5D
+	 */
+	static PrimitiveTypeEnumeration =
+		{
+			Boolean: 1,
+			Byte: 2,
+			Char: 3,
+			Unused: 4,
+			Decimal: 5,
+			Double: 6,
+			Int16: 7,
+			Int32: 8,
+			Int64: 9,
+			SByte: 10,
+			Single: 11,
+			TimeSpan: 12,
+			DateTime: 13,
+			UInt16: 14,
+			UInt32: 15,
+			UInt64: 16,
+			Null: 17,
+			String: 18,
+		};
+
+	/**
 	 * An enumeration containing valid record types.
 	 * 
 	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A72%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C583%2C0%5D
@@ -104,50 +148,6 @@ export class DotNetBinaryReader extends BinaryReader
 			ArraySingleString: 17,
 			MethodCall: 21,
 			MethodReturn: 22,
-		};
-
-	/**
-	 * An enumeration containing valid binary types.
-	 * 
-	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A75%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C434%2C0%5D
-	 */
-	static BinaryTypeEnumeration =
-		{
-			Primitive: 0,
-			String: 1,
-			Object: 2,
-			SystemClass: 3,
-			Class: 4,
-			ObjectArray: 5,
-			StringArray: 6,
-			PrimitiveArray: 7,
-		};
-
-	/**
-	 * An enumeration containing valid primitive types.
-	 * 
-	 * @see https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NRBF/[MS-NRBF].pdf#%5B%7B%22num%22%3A77%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C625%2C0%5D
-	 */
-	static PrimitiveTypeEnumeration =
-		{
-			Boolean: 1,
-			Byte: 2,
-			Char: 3,
-			Unused: 4,
-			Decimal: 5,
-			Double: 6,
-			Int16: 7,
-			Int32: 8,
-			Int64: 9,
-			SByte: 10,
-			Single: 11,
-			TimeSpan: 12,
-			DateTime: 13,
-			UInt16: 14,
-			UInt32: 15,
-			UInt64: 16,
-			Null: 17,
-			String: 18,
 		};
 
 	/**
